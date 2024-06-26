@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+
+# Connect the Grove Ultrasonic Ranger to digital port D2
+
+ultrasonic_ranger_D2 = 2
+ultrasonic_ranger_D3 = 3
+
+import requests
+import json
+import time
+import numpy as np
+import sys
+import cv2
+import base64
+import grovepi
+import time
+import math
+import random
+from grove_rgb_lcd import *
+
+ans = 0;
+count = 0;
+counter = 1;
+count_tle = 0;
+tle = [0]*25;
+tle_count = list(range(5));
+
+while True:
+    cap = cv2.VideoCapture(0)
+    ret, frame = cap.read()
+    cv2.imshow('frame',frame)
+    path = "photo.jpg"
+    cv2.imwrite(path,frame)
+
+    IMAGE = cv2.imread("photo.jpg")
+    h,w = IMAGE.shape[:2]
+    result = cv2.resize(IMAGE,(int(w/2),int(h/2)))
+    cv2.imwrite(path,result)
+
+    _, encimg = cv2.imencode(".png", result)
+    img_str = encimg.tostring()
+    img_byte = base64.b64encode(img_str).decode("utf-8")
+    img_json = json.dumps({'image': img_byte}).encode('utf-8')
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+    while(count < 25):
+        tle[count] = random.randint(0,1)
+        count = count + 1
+
+    count = 0
+
+    meterD2 = grovepi.ultrasonicRead(ultrasonic_ranger_D2)
+    meterD3 = grovepi.ultrasonicRead(ultrasonic_ranger_D3)
+    print(meterD2)
+    print(meterD3)
+    if(meterD2 < 50):
+        tle[0] = 1
+    else:
+        tle[0] = 0
+
+    if(meterD3 < 50):
+        tle[1] = 1
+    else:
+        tle[1] = 0
+
+    while(counter < 6):
+
+        while(count < counter*5):
+            if(tle[count] == 1):
+                count_tle = count_tle + 1
+            count = count + 1
+
+        tle_count[counter-1] = count_tle
+        counter = counter + 1
+        count_tle = 0;
+
+    counter = 0
+    count = 0
+
+    print(tle)
+
+    url = "http://192.168.0.1:5005/get_photo"
+    post = {'image':img_byte}
+    res = requests.post(url, json = post)
+    jsondata = res.json()
+
+    url = "http://192.168.0.1:5005/get_distance"
+    print(tle_count)
+    post = {'wc':tle_count}
+    res = requests.post(url, json = post)
+    jsondata = res.json()
+
+    time.sleep(1000)
+
+#print(jsondata)
